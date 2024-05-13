@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "macrostrat-isopach"
+version = "0.1.0"
+description = ""
+authors = ["Daven Quinn <code@davenquinn.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+scipy = "^1.13.0"
+rasterio = "^1.3.10"
+geopandas = "^0.14.4"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
