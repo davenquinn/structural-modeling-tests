@@ -35,6 +35,11 @@ def MaxAgeDependency(value: float | str):
     return _AgeDependency(value, "b_age")
 
 
+def BoundsDependency(value: Path):
+    bounds = G.read_file(value)
+    return bounds.total_bounds
+
+
 @app.command(no_args_is_help=True)
 def isopach_map(
     output_file: Path,
@@ -44,6 +49,7 @@ def isopach_map(
     min_age=Option(None, help="Minimum (upper) age", callback=MinAgeDependency),
     max_age=Option(None, help="Maximum (lower) age", callback=MaxAgeDependency),
     lith=Option(None, help="Lithology to filter by"),
+    bounds=Option(None, help="Bounds to filter by", callback=BoundsDependency),
 ):
     """Create a map of isopach data for a given stratigraphic unit"""
     print(f"Creating isopach map for {strat_name}")
@@ -93,11 +99,12 @@ def isopach_map(
         ]
     ]
 
-    units.dropna(subset=["unit_id"], inplace=True)
-    if crs is not None:
-        units = units.to_crs(crs)
+    if not rasterize:
+        units.dropna(subset=["unit_id"], inplace=True)
+        if crs is not None:
+            units = units.to_crs(crs)
 
-    units.to_file(output_file, driver="GPKG")
+        units.to_file(output_file, driver="GPKG")
 
 
 def get_all_columns(project_id=1):
