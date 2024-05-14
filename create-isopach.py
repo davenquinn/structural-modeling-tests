@@ -3,35 +3,56 @@
 
 from pathlib import Path
 
-from IPython import embed
+# URL encoding
+from urllib.parse import urlencode
+
+import geopandas as G
+import pandas as P
+import requests
 from typer import Typer
 
 app = Typer()
 
+# These could become environment variables
+cache_dir = Path("cache")
+macrostrat_api = "https://dev2.macrostrat.org/api/v2"
+
+
+def get_all_columns(project_id=1):
+    cache_dir.mkdir(exist_ok=True)
+    cache_file = cache_dir / f"columns-project-{project_id}.gpkg"
+
+    if cache_file.exists():
+        return G.read_file(cache_file)
+
+    params = {"project_id": project_id, "format": "geojson_bare"}
+    uri = macrostrat_api + "/columns?" + urlencode(params)
+    columns = G.read_file(uri)
+    columns.to_file(cache_file, driver="GPKG")
+    return columns
+
 
 @app.command()
-def isopach_map(strat_name: str, crs="EPSG:5070"):
+def isopach_map(
+    strat_name: str = None,
+    crs="EPSG:5070",
+    rasterize=False,
+    macrostrat_api="https://dev2.macrostrat.org/api/v2",
+):
     """Create a map of isopach data for a given stratigraphic unit"""
     print(f"Creating isopach map for {strat_name}")
 
-    import geopandas as G
-
-    # Albers lower 48
-    crs = "EPSG:5070"
-
-    all_columns = G.read_file(
-        "https://dev2.macrostrat.org/api/v2/columns?project_id=1&format=geojson_bare"
-    ).to_crs(crs)
+    all_columns = get_all_columns()
 
     # column_centers = all_columns["geometry"].centroid
 
-    matched_units = G.read_file(
-        f"https://dev2.macrostrat.org/api/v2/units?strat_name={strat_name}&format=geojson_bare"
-    ).to_crs(crs)
+    params = {"strat_name": strat_name}
+    uri = macrostrat_api + "/units?" + urlencode(params)
 
-    # Expand the matched units to the column footprints
+    data = requests.get(uri).json()
+    units = P.json_normalize(data["success"]["data"])
 
-    units = all_columns.sjoin(matched_units, how="left")
+    units = all_columns.merge(units, left_on="col_id", right_on="col_id")
 
     # Rename columns
     units = units.rename(columns={"col_id_left": "col_id"})
@@ -41,6 +62,7 @@ def isopach_map(strat_name: str, crs="EPSG:5070"):
         [
             "col_id",
             "unit_id",
+            "unit_name",
             "col_name",
             "col_group",
             "geometry",
