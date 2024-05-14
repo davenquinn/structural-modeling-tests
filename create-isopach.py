@@ -10,7 +10,7 @@ app = Typer()
 
 
 @app.command()
-def isopach_map(strat_name: str):
+def isopach_map(strat_name: str, crs="EPSG:5070"):
     """Create a map of isopach data for a given stratigraphic unit"""
     print(f"Creating isopach map for {strat_name}")
 
@@ -51,13 +51,13 @@ def isopach_map(strat_name: str):
         ]
     ]
 
+    units.dropna(subset=["unit_id"], inplace=True)
+
     # Dump the units to a file
     output_path = Path("output")
     output_path.mkdir(exist_ok=True)
 
     units.to_file(output_path / f"{strat_name}-isopach.gpkg", driver="GPKG")
-
-    embed()
 
 
 if __name__ == "__main__":
