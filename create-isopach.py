@@ -19,7 +19,11 @@ cache_dir = Path("cache")
 macrostrat_api = "https://dev2.macrostrat.org/api/v2"
 
 
-def _AgeDependency(value: float | str, type: str):
+def _AgeDependency(value: float | str | None, type: str):
+    if value is None:
+        return None
+    if isinstance(value, float):
+        return value
     try:
         return float(value)
     except ValueError:
@@ -27,17 +31,12 @@ def _AgeDependency(value: float | str, type: str):
         return float(interval[type])
 
 
-def MinAgeDependency(value: float | str):
+def MinAgeDependency(value: float | str | None):
     return _AgeDependency(value, "t_age")
 
 
-def MaxAgeDependency(value: float | str):
+def MaxAgeDependency(value: float | str | None):
     return _AgeDependency(value, "b_age")
-
-
-def BoundsDependency(value: Path):
-    bounds = G.read_file(value)
-    return bounds.total_bounds
 
 
 @app.command(no_args_is_help=True)
@@ -45,11 +44,10 @@ def isopach_map(
     output_file: Path,
     strat_name: str = None,
     crs="EPSG:5070",
-    rasterize=False,
     min_age=Option(None, help="Minimum (upper) age", callback=MinAgeDependency),
     max_age=Option(None, help="Maximum (lower) age", callback=MaxAgeDependency),
     lith=Option(None, help="Lithology to filter by"),
-    bounds=Option(None, help="Bounds to filter by", callback=BoundsDependency),
+    bounds: Path = Option(None, help="Bounds to filter by"),
 ):
     """Create a map of isopach data for a given stratigraphic unit"""
     print(f"Creating isopach map for {strat_name}")
@@ -57,7 +55,8 @@ def isopach_map(
     all_columns = get_all_columns()
 
     # column_centers = all_columns["geometry"].centroid
-    if min_age > max_age:
+
+    if min_age is not None and max_age is not None and min_age > max_age:
         raise ValueError("Minimum age must be less than maximum age")
 
     params = {"strat_name": strat_name, "age_top": min_age, "age_bottom": max_age}
@@ -67,6 +66,9 @@ def isopach_map(
         params[lith_level] = lith
 
     units = P.json_normalize(get_macrostrat("units", params))
+
+    def commasep(x):
+        return ",".join([str(i) for i in x if i != N.nan])
 
     commasep = lambda x: ",".join([str(i) for i in x])
 
@@ -82,7 +84,8 @@ def isopach_map(
         }
     )
 
-    units = all_columns.merge(units, left_on="col_id", right_on="col_id")
+    units = all_columns.merge(units, left_on="col_id", right_on="col_id", how="left")
+
     # Drop all columns except the column id and the geometry
     units = units[
         [
@@ -98,13 +101,74 @@ def isopach_map(
             "max_thick",
         ]
     ]
+    if crs is not None:
+        units = units.to_crs(crs)
+
+    # Clip to bounds
+    if bounds is not None:
+        _bounds = G.read_file(bounds)
+        _bounds = _bounds.to_crs(units.crs)
+        units = G.clip(units, _bounds)
+
+    # Copy the geodataframe
+    units1 = units.copy()
+    units1.dropna(subset=["unit_id"], inplace=True)
+    units1.to_file(output_file.with_suffix(".gpkg"), driver="GPKG")
+
+    if output_file.suffix == ".tif":
+        rasterize = True
 
     if not rasterize:
-        units.dropna(subset=["unit_id"], inplace=True)
-        if crs is not None:
-            units = units.to_crs(crs)
+        return
 
-        units.to_file(output_file, driver="GPKG")
+    # Set NaN values to 0
+    units.fillna(0, inplace=True)
+
+    # Get centroids
+    ctr = units["geometry"].centroid
+    max_thick = units["max_thick"]
+
+    # Interpolate the thickness to the centroids
+    import numpy as N
+    import rasterio as R
+    import scipy.interpolate as I
+    from rasterio.features import geometry_mask
+
+    _bounds = units.total_bounds
+    xmin, ymin, xmax, ymax = _bounds
+
+    # Get a regular grid of points
+    # Note: equal spacing is not guaranteed
+    X, Y = N.meshgrid(N.linspace(xmin, xmax, 1000), N.linspace(ymin, ymax, 1000))
+
+    interpolator = I.CloughTocher2DInterpolator(
+        list(zip(ctr.x, ctr.y)), max_thick, rescale=True
+    )
+    Z = interpolator(X, Y)
+
+    # Create a raster from the interpolated data
+    dset = R.open(
+        output_file.with_suffix(".tif"),
+        "w",
+        driver="GTiff",
+        height=Z.shape[1],
+        width=Z.shape[0],
+        count=1,
+        dtype=Z.dtype,
+        crs=units.crs,
+        transform=R.transform.from_bounds(
+            xmin, ymax, xmax, ymin, width=Z.shape[0], height=Z.shape[1]
+        ),
+    )
+
+    msk = geometry_mask(
+        units["geometry"],
+        out_shape=(1000, 1000),
+        transform=dset.transform,
+    )
+    Z[msk] = N.nan
+    Z[Z < 0] = N.nan
+    dset.write(Z, 1)
 
 
 def get_all_columns(project_id=1):
