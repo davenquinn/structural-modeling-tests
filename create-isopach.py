@@ -48,6 +48,7 @@ def isopach_map(
     max_age=Option(None, help="Maximum (lower) age", callback=MaxAgeDependency),
     lith=Option(None, help="Lithology to filter by"),
     bounds: Path = Option(None, help="Bounds to filter by"),
+    n_samples: int = Option(1000, help="Number of samples for rasterization"),
 ):
     """Create a map of isopach data for a given stratigraphic unit"""
     print(f"Creating isopach map for {strat_name}")
@@ -139,7 +140,9 @@ def isopach_map(
 
     # Get a regular grid of points
     # Note: equal spacing is not guaranteed
-    X, Y = N.meshgrid(N.linspace(xmin, xmax, 1000), N.linspace(ymin, ymax, 1000))
+    X, Y = N.meshgrid(
+        N.linspace(xmin, xmax, n_samples), N.linspace(ymin, ymax, n_samples)
+    )
 
     interpolator = I.CloughTocher2DInterpolator(
         list(zip(ctr.x, ctr.y)), max_thick, rescale=True
@@ -163,7 +166,7 @@ def isopach_map(
 
     msk = geometry_mask(
         units["geometry"],
-        out_shape=(1000, 1000),
+        out_shape=(n_samples, n_samples),
         transform=dset.transform,
     )
     Z[msk] = N.nan
