@@ -10,6 +10,7 @@ from rasterio.features import geometry_mask
 from pathlib import Path
 from shapely.geometry import LineString
 from pyproj import Transformer
+from .model import create_geological_model, create_bounds
 
 app = Typer()
 
@@ -22,28 +23,10 @@ ft_to_m = 0.3048006096012192
 here = Path(__file__).parent.parent
 
 
-@app.command("build")
+@app.command("create-surfaces")
 def process_well_data():
-    """Ingest well data, find surfaces, and create raster images"""
-
-    df = read_csv("data/Williston_Basin_well_data.csv")
-    # Set index to WELL_ID
-    df.set_index("WELL_ID", inplace=True)
-    # Well data starts at column 7, convert to meters
-    df.iloc[:, 6:] *= ft_to_m
-
-    # Convert to GeoDataFrame using LAT and LON columns
-    gdf = G.GeoDataFrame(
-        df, geometry=G.points_from_xy(df.LONG, df.LAT, crs="EPSG:4326")
-    )
-    gdf = gdf.iloc[:, 6:]
-    # Move geometry to the beginning, and keep only formation top depths
-    gdf = gdf[
-        ["geometry"]
-        + [col for col in gdf.columns if (col != "geometry" and "TOP" in col)]
-    ]
-
-    gdf = gdf.to_crs(crs)
+    """Ingest well data and create surfaces using a Scipy interpolator"""
+    gdf = read_well_data()
 
     well_info = gdf.copy()
     max_depth = well_info.iloc[:, 1:].min(axis=1)
@@ -55,11 +38,8 @@ def process_well_data():
     well_info.to_file("output/well-info.gpkg", layer="metadata", driver="GPKG")
 
     # Create a buffer around the wells to form a rough basin outline
-    buffer = (
-        well_info["geometry"].buffer(100000).unary_union.buffer(-90000).simplify(10000)
-    )
+    bounds = create_bounds(gdf)
     # Save the buffer as bounds
-    bounds = G.GeoDataFrame(geometry=[buffer], crs=crs)
     bounds.to_file("output/well-info.gpkg", layer="bounds", driver="GPKG")
 
     grid = meshgrid_2d(bounds, 1000)
@@ -67,11 +47,11 @@ def process_well_data():
 
     size_args = dict(width=grid[0].shape[1], height=grid[0].shape[0])
 
-    transform = rasterio.transform.from_bounds(xmin, ymax, xmax, ymin, **size_args)
+    _transform = rasterio.transform.from_bounds(xmin, ymax, xmax, ymin, **size_args)
 
     # Each row of the spreadsheet is a well
 
-    mask = geometry_mask(bounds.geometry, out_shape=grid[0].shape, transform=transform)
+    mask = geometry_mask(bounds.geometry, out_shape=grid[0].shape, transform=_transform)
 
     for name in gdf.iloc[:, 1:]:
         df1 = gdf[["geometry", name]].dropna(subset=[name])
@@ -95,11 +75,20 @@ def process_well_data():
             **size_args,
             count=1,
             crs=crs,
-            transform=transform,
+            transform=_transform,
             dtype=Z.dtype,
         ) as dst:
             Z[mask] = nan
             dst.write(Z, 1)
+
+    embed()
+
+
+@app.command("model")
+def create_model():
+    """Create a geological model from the well data using Loop3D"""
+    gdf = read_well_data()
+    model = create_geological_model(gdf)
 
     embed()
 
@@ -163,6 +152,27 @@ def meshgrid_2d(bounds, n_samples):
         nsx, nsy = nsy, nsx
 
     return meshgrid(linspace(xmin, xmax, nsx), linspace(ymin, ymax, nsy))
+
+
+def read_well_data():
+    df = read_csv("data/Williston_Basin_well_data.csv")
+    # Set index to WELL_ID
+    df.set_index("WELL_ID", inplace=True)
+    # Well data starts at column 7, convert to meters
+    df.iloc[:, 6:] *= ft_to_m
+
+    # Convert to GeoDataFrame using LAT and LON columns
+    gdf = G.GeoDataFrame(
+        df, geometry=G.points_from_xy(df.LONG, df.LAT, crs="EPSG:4326")
+    )
+    gdf = gdf.iloc[:, 6:]
+    # Move geometry to the beginning, and keep only formation top depths
+    gdf = gdf[
+        ["geometry"]
+        + [col for col in gdf.columns if (col != "geometry" and "TOP" in col)]
+    ]
+
+    return gdf.to_crs(crs)
 
 
 if __name__ == "__main__":
