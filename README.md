@@ -1,8 +1,6 @@
-# Macrostrat isopach pipeline
+# Structural modeling
 
-Create isopach maps from the Macrostrat database.
-
-```
-create-isopach.py --lith carbonate --min-age "Early Ordovician" --max-age Cambrian output/cambrian-to-early-ordovician-carbonates.gpkg
-```
-If you want a rasterized file, use a `.tif` extension.
+This directory contains test scripts for integrating structural
+modeling approaches with Macrostrat's systems. We seek to eventually
+generate 3D models of the subsurface that can be pulled into Macrostrat's
+systems.
