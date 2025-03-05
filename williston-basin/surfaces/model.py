@@ -21,8 +21,8 @@ def create_model_extents(gdf, z_range=None):
         z_range = [-5000, 1000]
 
     xy_bounds = gdf.total_bounds
-    origin = N.array([xy_bounds[0], xy_bounds[1], z_range[0]])
-    extent = N.array([xy_bounds[2], xy_bounds[3], z_range[1]])
+    origin = N.array([xy_bounds[0], xy_bounds[1], z_range[0] * 100])
+    extent = N.array([xy_bounds[2], xy_bounds[3], z_range[1] * 100])
     return origin, extent
 
 
@@ -33,22 +33,36 @@ def create_model_constraints(gdf):
     df = None
 
     frames = []
-    for name in gdf.iloc[:, 1:]:
+    units = dict()
+    for ix, name in enumerate(gdf.iloc[:, 1:]):
         # Get picks for each formation in the geodataframe
         df1 = gdf[["geometry", name]].dropna(subset=[name])
 
+        val = -ix
         dfa = DataFrame(
             {
                 "X": df1.geometry.x,
                 "Y": df1.geometry.y,
-                "Z": df1[name],
-                "strat_name": name,
+                "Z": df1[name] * 100,
+                "val": val,
+                "unit_name": name,
+                "feature_name": "main",
             }
         )
-        dfa.set_index("strat_name", append=True, inplace=True)
+        dfa.set_index("unit_name", append=True, inplace=True)
         frames.append(dfa)
+
+        min = val - 1
+        if ix == len(gdf.columns) - 2:
+            min = -N.inf
+
+        units[name] = {
+            "max": val,
+            "min": min,
+            "id": ix,
+        }
     # Stack the dataframes
-    return pandas.concat(frames)
+    return pandas.concat(frames), dict(main=units)
 
 
 def create_bounds(gdf):

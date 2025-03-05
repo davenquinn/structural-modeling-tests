@@ -10,7 +10,13 @@ from rasterio.features import geometry_mask
 from pathlib import Path
 from shapely.geometry import LineString
 from pyproj import Transformer
-from .model import create_geological_model, create_bounds, create_model_constraints, run_loop_demo
+from .model import (
+    create_geological_model,
+    create_bounds,
+    create_model_constraints,
+    run_loop_demo,
+)
+from LoopStructural.visualisation import Loop3DView
 
 app = Typer()
 
@@ -85,20 +91,28 @@ def process_well_data():
 
 
 @app.command("model")
-def create_model():
+def create_model(show_3d: bool = False):
     """Create a geological model from the well data using Loop3D"""
     gdf = read_well_data()
     model = create_geological_model(gdf)
 
-    df = create_model_constraints(gdf)
+    df, column = create_model_constraints(gdf)
 
-    # model.set_stratigraphic_column()
+    # Randomly sample data by factor of 100 for testing
+    df = df.sample(frac=0.01)
 
-    embed()
+    model.set_model_data(df)
+    for strat in column.keys():
+        model.create_and_add_foliation(strat, interpolatortype="FDI", nelements=1e5)
+    model.set_stratigraphic_column(column)
+
+    viewer = Loop3DView(model)
+    viewer.plot_block_model(scalar_bar=True, slicer=True)
+    viewer.show(interactive=True)
+
+
 
 app.command("loop-demo")(run_loop_demo)
-
-
 
 
 sections = [
