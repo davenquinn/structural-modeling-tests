@@ -1,3 +1,4 @@
+from shapely.ops import transform
 from typer import Typer
 from pandas import read_csv
 from IPython import embed
@@ -6,6 +7,9 @@ from numpy import meshgrid, linspace, nan
 from scipy.interpolate import CloughTocher2DInterpolator
 import rasterio
 from rasterio.features import geometry_mask
+from pathlib import Path
+from shapely.geometry import LineString
+from pyproj import Transformer
 
 app = Typer()
 
@@ -14,6 +18,8 @@ app = Typer()
 crs = "EPSG:5069"
 # U.S. Survey foot to meter conversion
 ft_to_m = 0.3048006096012192
+
+here = Path(__file__).parent.parent
 
 
 @app.command("build")
@@ -96,6 +102,56 @@ def process_well_data():
             dst.write(Z, 1)
 
     embed()
+
+
+sections = [
+    [
+        (-106.6000, 48.9654),
+        (-100.8362, 45.7890),
+    ],
+    [
+        (-107.0315, 48.1072),
+        (-99.8404, 47.4613),
+    ],
+]
+
+
+@app.command("cross-sections")
+def build_cross_sections():
+    """Create a cross section of the basin between two points, and plot with matplotlib"""
+    # Create geometry for the cross section
+    for section in sections:
+        start, end = section
+        line = LineString([start, end])
+        transformer = Transformer.from_crs(4326, crs, always_xy=True)
+        line_prj = transform(transformer.transform, line)
+
+        # Load the raster data surface-by-surface and interpolate along the cross section
+        series = {}
+
+        for file in (here / "output").glob("*.tif"):
+            key = file.stem
+            with rasterio.open(file) as src:
+                # # Extract the raster data along the cross section
+                xy = [
+                    line_prj.interpolate(d).coords[0]
+                    for d in range(0, int(line_prj.length), 100)
+                ]
+                # # Extract the raster values at the cross section points
+                values = list(src.sample(xy))
+                series[key] = values
+
+        # Plot the cross section
+
+        import matplotlib.pyplot as plt
+
+        plt.figure(figsize=(12, 3))
+        ax = plt.subplot(111)
+
+        for key, values in series.items():
+            ax.plot(values, label=key)
+        # ax.legend()
+        plt.show()
 
 
 def meshgrid_2d(bounds, n_samples):
