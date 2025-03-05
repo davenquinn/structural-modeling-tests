@@ -16,7 +16,7 @@ crs = "EPSG:5069"
 ft_to_m = 0.3048006096012192
 
 
-@app.command()
+@app.command("build")
 def process_well_data():
     """Ingest well data, find surfaces, and create raster images"""
 
@@ -37,13 +37,14 @@ def process_well_data():
         + [col for col in gdf.columns if (col != "geometry" and "TOP" in col)]
     ]
 
+    gdf = gdf.to_crs(crs)
+
     well_info = gdf.copy()
     max_depth = well_info.iloc[:, 1:].min(axis=1)
     n_surfaces = well_info.iloc[:, 1:].count(axis=1)
     well_info = well_info[["geometry"]].assign(
         max_depth=max_depth, n_surfaces=n_surfaces
     )
-    well_info = well_info.to_crs(crs)
 
     well_info.to_file("output/well-info.gpkg", layer="metadata", driver="GPKG")
 
@@ -58,7 +59,7 @@ def process_well_data():
     grid = meshgrid_2d(bounds, 1000)
     xmin, ymin, xmax, ymax = bounds.total_bounds
 
-    size_args = dict(width=grid[0].shape[0], height=grid[0].shape[1])
+    size_args = dict(width=grid[0].shape[1], height=grid[0].shape[0])
 
     transform = rasterio.transform.from_bounds(xmin, ymax, xmax, ymin, **size_args)
 
@@ -72,7 +73,7 @@ def process_well_data():
         # Get the formation name
         formation = name
         # Get the xy coordinates of the wells
-        xy = df1.geometry.x, df1.geometry.y
+        xy = list(zip(df1.geometry.x, df1.geometry.y))
         # Get the formation top depths
         tops = df1[name].values
 
@@ -93,6 +94,7 @@ def process_well_data():
         ) as dst:
             Z[mask] = nan
             dst.write(Z, 1)
+
     embed()
 
 
@@ -100,8 +102,8 @@ def meshgrid_2d(bounds, n_samples):
     # Create a regular grid of points within the bounds
     xmin, ymin, xmax, ymax = bounds.total_bounds
     aspect_ratio = (xmax - xmin) / (ymax - ymin)
-    nsx, nsy = 100, int(100 / aspect_ratio)
-    if aspect_ratio < 1:
+    nsx, nsy = n_samples, int(n_samples / aspect_ratio)
+    if aspect_ratio > 1:
         nsx, nsy = nsy, nsx
 
     return meshgrid(linspace(xmin, xmax, nsx), linspace(ymin, ymax, nsy))
