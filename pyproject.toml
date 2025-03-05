@@ -19,7 +19,8 @@ dependencies = [
     "rasterio (>=1.4.3,<2.0.0)",
     "matplotlib (>=3.10.1,<4.0.0)",
     "itermplot (==0.5)",
-    "pyproj (>=3.7.1,<4.0.0)"
+    "pyproj (>=3.7.1,<4.0.0)",
+    "loopstructural (>=1.6.8,<2.0.0)"
 ]
 
 [tool.poetry]
