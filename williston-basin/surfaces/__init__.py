@@ -33,8 +33,8 @@ def process_well_data():
     n_surfaces = well_info.iloc[:,1:].count(axis=1)
     well_info = well_info[["geometry"]].assign(max_depth=max_depth, n_surfaces=n_surfaces)
     well_info = well_info.to_crs(crs)
-    well_info.to_file("data/well-info.gpkg", driver="GPKG")
 
+    well_info.to_file("output/well-info.gpkg", layer="metadata", driver="GPKG")
 
     # Each row of the spreadsheet is a well
     embed()

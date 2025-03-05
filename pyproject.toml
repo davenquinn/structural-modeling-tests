@@ -1,24 +1,34 @@
-[tool.poetry]
-name = "macrostrat-isopach"
-version = "0.1.0"
+[project]
+name = "macrostrat-structural-modeling"
+version = "1.0.0"
 description = ""
-authors = ["Daven Quinn <code@davenquinn.com>"]
+authors = [
+    {name = "Daven Quinn",email = "code@davenquinn.com"}
+]
 readme = "README.md"
+requires-python = ">=3.12,<4.0"
+dependencies = [
+    "numpy (>=2.2.3,<3.0.0)",
+    "scipy (>=1.15.2,<2.0.0)",
+    "ipython (>=9.0.1,<10.0.0)",
+    "pandas (>=2.2.3,<3.0.0)",
+    "typer (>=0.15.2,<0.16.0)",
+    "geopandas (>=1.0.1,<2.0.0)",
+    "requests (>=2.32.3,<3.0.0)",
+    "rich (>=13.9.4,<14.0.0)",
+    "rasterio (>=1.4.3,<2.0.0)"
+]
 
-[tool.poetry.dependencies]
-python = "^3.11"
-scipy = "^1.13.0"
-rasterio = "^1.3.10"
-geopandas = "^0.14.4"
-typer = "^0.12.3"
-requests = "^2.31.0"
-rich = "^13.7.1"
+[tool.poetry]
+packages = [
+    {include = "surfaces", from = "williston-basin"}
+]
 
 
 [tool.poetry.group.dev.dependencies]
-isort = "^5.13.2"
-ipython = "^8.24.0"
+isort = "^6.0.1"
+black = "^25.1.0"
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
