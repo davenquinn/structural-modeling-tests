@@ -10,7 +10,7 @@ from rasterio.features import geometry_mask
 from pathlib import Path
 from shapely.geometry import LineString
 from pyproj import Transformer
-from .model import create_geological_model, create_bounds
+from .model import create_geological_model, create_bounds, create_model_constraints, run_loop_demo
 
 app = Typer()
 
@@ -90,7 +90,15 @@ def create_model():
     gdf = read_well_data()
     model = create_geological_model(gdf)
 
+    df = create_model_constraints(gdf)
+
+    # model.set_stratigraphic_column()
+
     embed()
+
+app.command("loop-demo")(run_loop_demo)
+
+
 
 
 sections = [
