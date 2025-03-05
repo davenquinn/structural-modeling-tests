@@ -7,7 +7,6 @@ from LoopStructural.datasets import load_claudius
 from LoopStructural.visualisation import Loop3DView
 from IPython import embed
 
-
 def create_geological_model(gdf):
 
     extents = create_model_extents(gdf)

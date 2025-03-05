@@ -102,14 +102,21 @@ def create_model(show_3d: bool = False):
     df = df.sample(frac=0.01)
 
     model.set_model_data(df)
+    strata = []
     for strat in column.keys():
-        model.create_and_add_foliation(strat, interpolatortype="FDI", nelements=1e5)
+        s0 = model.create_and_add_foliation(
+            strat, interpolatortype="FDI", nelements=1e4
+        )
+        strata.append(s0)
     model.set_stratigraphic_column(column)
 
-    viewer = Loop3DView(model)
-    viewer.plot_block_model(scalar_bar=True, slicer=True)
-    viewer.show(interactive=True)
-
+    if show_3d:
+        viewer = Loop3DView(model)
+        for s0 in strata:
+            # viewer.plot_data(s0, scale=200)
+            viewer.plot_surface(s0, value=1)
+        # viewer.plot_block_model(scalar_bar=True, slicer=True)
+        viewer.show(interactive=True)
 
 
 app.command("loop-demo")(run_loop_demo)
