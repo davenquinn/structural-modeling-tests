@@ -37,7 +37,7 @@ def process_well_data():
     well_info.to_file("output/well-info.gpkg", layer="metadata", driver="GPKG")
 
     # Create a buffer around the wells to form a rough basin outline
-    buffer = well_info["geometry"].buffer(100000).unary_union.buffer(-50000).simplify(10000)
+    buffer = well_info["geometry"].buffer(100000).unary_union.buffer(-90000).simplify(10000)
     # Save the buffer as bounds
     bounds = G.GeoDataFrame(geometry=[buffer], crs=crs)
     bounds.to_file("output/well-info.gpkg", layer="bounds", driver="GPKG")
