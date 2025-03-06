@@ -53,15 +53,16 @@ def create_model_constraints(gdf):
         frames.append(dfa)
 
         min = val - 1
-        if ix == len(gdf.columns) - 2:
-            min = -N.inf
+        # if ix == len(gdf.columns) - 2:
+        #     min = -100000
 
         units[name] = {
             "max": val,
             "min": min,
-            "id": ix,
+            "id": val,
         }
     # Stack the dataframes
+    print(units)
     return pandas.concat(frames), dict(main=units)
 
 

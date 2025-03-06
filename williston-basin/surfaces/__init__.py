@@ -87,6 +87,13 @@ def process_well_data():
         xy = list(zip(df1.geometry.x, df1.geometry.y))
         # Get the formation top depths
         tops = df1[name].values
+
+        # Mask values by data bounds of each cohort
+        bounds1 = create_bounds(df1)
+        mask = geometry_mask(
+            bounds1.geometry, out_shape=grid[0].shape, transform=_transform
+        )
+
         create_interpolated_raster(
             xy, tops, model_type, formation, grid, mask, _transform
         )
@@ -133,7 +140,7 @@ def create_model(show: bool = False):
     strata = []
     for strat in column.keys():
         s0 = model.create_and_add_foliation(
-            strat, interpolatortype="FDI", nelements=1e4
+            strat, interpolatortype="FDI", nelements=1e4  # , tol=1e-8, cgw=1e-8
         )
         strata.append(s0)
     model.set_stratigraphic_column(column)
@@ -162,7 +169,9 @@ def create_model(show: bool = False):
     mask = geometry_mask(bounds.geometry, out_shape=grid[0].shape, transform=_transform)
 
     unit_names = column["main"].keys()
+    print(unit_names)
     for name, surface in zip(unit_names, surfaces):
+        print(name)
         vertices = surface.vertices
         xy = vertices[:, :2]
         Z = vertices[:, 2]
@@ -223,6 +232,8 @@ def build_cross_sections(model_type: str = Argument("loop")):
 
         for key, values in series.items():
             ax.plot(values, label=key)
+
+        ax.set_ylim(-5000, 1000)
         # ax.legend()
         plt.show()
 
