@@ -56,76 +56,19 @@ def summarize_data():
 
 
 @app.command("create-surfaces")
-def process_well_data():
-    """Ingest well data and create surfaces using a Scipy interpolator"""
-    gdf = read_well_data()
-    model_type = "scipy"
-
-    # Create a buffer around the wells to form a rough basin outline
-    bounds = create_bounds(gdf)
-
-    grid = meshgrid_2d(bounds, 1000)
-    xmin, ymin, xmax, ymax = bounds.total_bounds
-
-    size_args = dict(width=grid[0].shape[1], height=grid[0].shape[0])
-
-    _transform = rasterio.transform.from_bounds(xmin, ymax, xmax, ymin, **size_args)
-
-    # Each row of the spreadsheet is a well
-
-    mask = geometry_mask(bounds.geometry, out_shape=grid[0].shape, transform=_transform)
-
-    dirname = here / "output" / model_type
-    dirname.mkdir(parents=True, exist_ok=True)
-
-    for name in gdf.iloc[:, 1:]:
-        df1 = gdf[["geometry", name]].dropna(subset=[name])
-
-        # Get the formation name
-        formation = name
-        # Get the xy coordinates of the wells
-        xy = list(zip(df1.geometry.x, df1.geometry.y))
-        # Get the formation top depths
-        tops = df1[name].values
-
-        # Mask values by data bounds of each cohort
-        bounds1 = create_bounds(df1)
-        mask = geometry_mask(
-            bounds1.geometry, out_shape=grid[0].shape, transform=_transform
-        )
-
-        create_interpolated_raster(
-            xy, tops, model_type, formation, grid, mask, _transform
-        )
+def create_surfaces(model: str = "loop", show: bool = True, view_3d: bool = False):
+    """Create surfaces using either a Scipy interpolator or Loop3D"""
+    if model == "loop":
+        process_well_data_loop(show=view_3d)
+    else:
+        if view_3d:
+            raise ValueError("3D view not supported for Scipy model")
+        process_well_data_scipy()
+    if show:
+        build_cross_sections(model)
 
 
-def create_interpolated_raster(xy, z, model_type, formation, grid, mask, _transform):
-    dirname = here / "output" / model_type
-    dirname.mkdir(parents=True, exist_ok=True)
-
-    size_args = dict(width=grid[0].shape[1], height=grid[0].shape[0])
-
-    print(f"Processing {formation} formation")
-
-    interpolator = CloughTocher2DInterpolator(xy, z, rescale=True)
-    Z = interpolator(*grid)
-
-    with rasterio.open(
-        str(dirname / f"{formation}.tif"),
-        "w",
-        driver="GTiff",
-        **size_args,
-        count=1,
-        crs=crs,
-        transform=_transform,
-        dtype=Z.dtype,
-    ) as dst:
-        Z[mask] = nan
-        dst.write(Z, 1)
-
-
-@app.command("model")
-def create_model(show: bool = False):
+def process_well_data_loop(show: bool = False):
     """Create a geological model from the well data using Loop3D"""
     gdf = read_well_data()
     model = create_geological_model(gdf)
@@ -169,9 +112,7 @@ def create_model(show: bool = False):
     mask = geometry_mask(bounds.geometry, out_shape=grid[0].shape, transform=_transform)
 
     unit_names = column["main"].keys()
-    print(unit_names)
     for name, surface in zip(unit_names, surfaces):
-        print(name)
         vertices = surface.vertices
         xy = vertices[:, :2]
         Z = vertices[:, 2]
@@ -183,6 +124,49 @@ def create_model(show: bool = False):
 
 
 app.command("loop-demo")(run_loop_demo)
+
+
+def process_well_data_scipy():
+    """Ingest well data and create surfaces using a Scipy interpolator"""
+    gdf = read_well_data()
+    model_type = "scipy"
+
+    # Create a buffer around the wells to form a rough basin outline
+    bounds = create_bounds(gdf)
+
+    grid = meshgrid_2d(bounds, 1000)
+    xmin, ymin, xmax, ymax = bounds.total_bounds
+
+    size_args = dict(width=grid[0].shape[1], height=grid[0].shape[0])
+
+    _transform = rasterio.transform.from_bounds(xmin, ymax, xmax, ymin, **size_args)
+
+    # Each row of the spreadsheet is a well
+
+    mask = geometry_mask(bounds.geometry, out_shape=grid[0].shape, transform=_transform)
+
+    dirname = here / "output" / model_type
+    dirname.mkdir(parents=True, exist_ok=True)
+
+    for name in gdf.iloc[:, 1:]:
+        df1 = gdf[["geometry", name]].dropna(subset=[name])
+
+        # Get the formation name
+        formation = name
+        # Get the xy coordinates of the wells
+        xy = list(zip(df1.geometry.x, df1.geometry.y))
+        # Get the formation top depths
+        tops = df1[name].values
+
+        # Mask values by data bounds of each cohort
+        bounds1 = create_bounds(df1)
+        mask = geometry_mask(
+            bounds1.geometry, out_shape=grid[0].shape, transform=_transform
+        )
+
+        create_interpolated_raster(
+            xy, tops, model_type, formation, grid, mask, _transform
+        )
 
 
 sections = [
@@ -236,6 +220,30 @@ def build_cross_sections(model_type: str = Argument("loop")):
         ax.set_ylim(-5000, 1000)
         # ax.legend()
         plt.show()
+
+def create_interpolated_raster(xy, z, model_type, formation, grid, mask, _transform):
+    dirname = here / "output" / model_type
+    dirname.mkdir(parents=True, exist_ok=True)
+
+    size_args = dict(width=grid[0].shape[1], height=grid[0].shape[0])
+
+    print(f"Processing {formation} formation")
+
+    interpolator = CloughTocher2DInterpolator(xy, z, rescale=True)
+    Z = interpolator(*grid)
+
+    with rasterio.open(
+        str(dirname / f"{formation}.tif"),
+        "w",
+        driver="GTiff",
+        **size_args,
+        count=1,
+        crs=crs,
+        transform=_transform,
+        dtype=Z.dtype,
+    ) as dst:
+        Z[mask] = nan
+        dst.write(Z, 1)
 
 
 def meshgrid_2d(bounds, n_samples):
