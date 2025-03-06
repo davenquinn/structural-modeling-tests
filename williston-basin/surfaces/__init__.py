@@ -1,5 +1,7 @@
 from os import environ
 
+from .make_grids import make_grids_from_ascii
+
 environ["MPLBACKEND"] = "module://itermplot"
 environ["ITERMPLOT"] = "rv"
 
@@ -125,6 +127,8 @@ def process_well_data_loop(show: bool = False):
 
 app.command("loop-demo")(run_loop_demo)
 
+app.command("make-grids")(make_grids_from_ascii)
+
 
 def process_well_data_scipy():
     """Ingest well data and create surfaces using a Scipy interpolator"""
@@ -189,8 +193,6 @@ def build_cross_sections(model_type: str = Argument("loop")):
     for section in sections:
         start, end = section
         line = LineString([start, end])
-        transformer = Transformer.from_crs(4326, crs, always_xy=True)
-        line_prj = transform(transformer.transform, line)
 
         # Load the raster data surface-by-surface and interpolate along the cross section
         series = {}
@@ -198,11 +200,14 @@ def build_cross_sections(model_type: str = Argument("loop")):
         for file in (here / "output" / model_type).glob("*.tif"):
             key = file.stem
             with rasterio.open(file) as src:
-                # # Extract the raster data along the cross section
+
+                transformer = Transformer.from_crs(4326, src.crs, always_xy=True)
+                line_prj = transform(transformer.transform, line)
                 xy = [
                     line_prj.interpolate(d).coords[0]
                     for d in range(0, int(line_prj.length), 100)
                 ]
+
                 # # Extract the raster values at the cross section points
                 values = list(src.sample(xy))
                 series[key] = values
@@ -220,6 +225,7 @@ def build_cross_sections(model_type: str = Argument("loop")):
         ax.set_ylim(-5000, 1000)
         # ax.legend()
         plt.show()
+
 
 def create_interpolated_raster(xy, z, model_type, formation, grid, mask, _transform):
     dirname = here / "output" / model_type
