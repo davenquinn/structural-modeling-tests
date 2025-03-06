@@ -19,7 +19,11 @@ dependencies = [
     "rasterio (>=1.4.3,<2.0.0)",
     "matplotlib (>=3.10.1,<4.0.0)",
     "itermplot (==0.5)",
-    "pyproj (>=3.7.1,<4.0.0)"
+    "pyproj (>=3.7.1,<4.0.0)",
+    "loopstructural (>=1.6.8,<2.0.0)",
+    "loopstructuralvisualisation (>=0.1.14,<0.2.0)",
+    "pyvista[all] (>=0.44.2,<0.45.0)",
+    "tqdm (>=4.67.1,<5.0.0)"
 ]
 
 [tool.poetry]
