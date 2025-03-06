@@ -7,6 +7,7 @@ from LoopStructural.datasets import load_claudius
 from LoopStructural.visualisation import Loop3DView
 from IPython import embed
 
+
 def create_geological_model(gdf):
 
     extents = create_model_extents(gdf)
@@ -20,8 +21,8 @@ def create_model_extents(gdf, z_range=None):
         z_range = [-5000, 1000]
 
     xy_bounds = gdf.total_bounds
-    origin = N.array([xy_bounds[0], xy_bounds[1], z_range[0] * 100])
-    extent = N.array([xy_bounds[2], xy_bounds[3], z_range[1] * 100])
+    origin = N.array([xy_bounds[0], xy_bounds[1], z_range[0]])
+    extent = N.array([xy_bounds[2], xy_bounds[3], z_range[1]])
     return origin, extent
 
 
@@ -42,7 +43,7 @@ def create_model_constraints(gdf):
             {
                 "X": df1.geometry.x,
                 "Y": df1.geometry.y,
-                "Z": df1[name] * 100,
+                "Z": df1[name],
                 "val": val,
                 "unit_name": name,
                 "feature_name": "main",
